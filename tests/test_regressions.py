@@ -535,3 +535,30 @@ def test_bootstrap_admin_is_explicit_and_idempotent(app, monkeypatch):
     assert services.obter_usuario_por_email("maintainer@example.com")["nivel_acesso"] == "ADMIN"
     assert services.criar_usuario("Ordinary", "ordinary@example.com", "StrongPass123")
     assert services.obter_usuario_por_email("ordinary@example.com")["nivel_acesso"] == "USER"
+
+
+def test_card_summaries_are_consistent_across_multiple_cards():
+    uid = user()
+    first = card(uid)
+    services.salvar_cartao(
+        uid, {"nome": "Other card", "limite_total": "900",
+              "dia_fechamento": "8", "dia_vencimento": "15"}
+    )
+    second = next(c for c in services.listar_cartoes(uid) if c["nome"] == "Other card")
+    services.registrar_compra_cartao(
+        uid, {"cartao_id": first["id"], "descricao": "First", "valor_total": "90",
+              "parcelas": "3", "data_compra": "2026-01-01"}
+    )
+    services.registrar_compra_cartao(
+        uid, {"cartao_id": second["id"], "descricao": "Second", "valor_total": "25",
+              "parcelas": "1", "data_compra": "2026-01-01"}
+    )
+    summary = services.resumo_faturas_geral(uid, "2026-01", meses=3)
+    assert [s["total"] for s in summary] == [
+        Decimal("55"), Decimal("30"), Decimal("30")
+    ]
+    totals = services.listar_cartoes(uid, ano_mes="2026-01")
+    by_id = {c["id"]: c for c in totals}
+    assert by_id[first["id"]]["fatura_atual"] == Decimal("30")
+    assert by_id[second["id"]]["fatura_atual"] == Decimal("25")
+    assert sum((p["valor"] for p in services.parcelas_cartao_mes(uid, "2026-01")), Decimal("0")) == Decimal("55")
