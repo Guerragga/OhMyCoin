@@ -26,7 +26,8 @@ def init_cli(app):
 
     @app.cli.command("bootstrap-user")
     @click.option("--if-enabled", is_flag=True, help="Only run when BOOTSTRAP_USER_ENABLED=True.")
-    def bootstrap_user(if_enabled):
+    @click.option("--admin", is_flag=True, help="Create the initial account as ADMIN (explicit opt-in).")
+    def bootstrap_user(if_enabled, admin):
         """Create one initial user from deployment secrets, without resetting it."""
         enabled = os.getenv("BOOTSTRAP_USER_ENABLED", "false").lower() in {"true", "1"}
         if if_enabled and not enabled:
@@ -48,7 +49,7 @@ def init_cli(app):
 
         from .services.users import criar_usuario
 
-        criar_usuario(name, email, password)
+        criar_usuario(name, email, password, nivel_acesso="ADMIN" if admin else "USER")
         click.echo("Bootstrap user created. Disable bootstrap variables now.")
 
     @app.cli.command("seed-demo")

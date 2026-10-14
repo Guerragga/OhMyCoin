@@ -23,12 +23,12 @@
             <form method="post">
                 {{ csrf_input() }}
                 <div class="mb-3">
-                    <label class="form-label" for="field-login-1-{{ loop.index if loop is defined else 0 }}">E-mail</label>
-                    <input type="email" name="email" class="form-control" placeholder="seuemail@exemplo.com" required autofocus id="field-login-1-{{ loop.index if loop is defined else 0 }}">
+                    <label class="form-label" for="field-login-email">E-mail</label>
+                    <input type="email" name="email" class="form-control" placeholder="seuemail@exemplo.com" required autofocus id="field-login-email">
                 </div>
                 <div class="mb-3">
-                    <label class="form-label" for="field-login-2-{{ loop.index if loop is defined else 0 }}">Senha</label>
-                    <input type="password" name="password" class="form-control" placeholder="Sua senha" required id="field-login-2-{{ loop.index if loop is defined else 0 }}">
+                    <label class="form-label" for="field-login-password">Senha</label>
+                    <input type="password" name="password" class="form-control" placeholder="Sua senha" required id="field-login-password">
                 </div>
                 <button class="btn btn-primary w-100 py-2">Entrar</button>
             </form>

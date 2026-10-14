@@ -494,7 +494,10 @@ def test_card_billing_cycle_cannot_rewrite_existing_installments():
         {"nome": "Renamed", "limite_total": "1200", "dia_fechamento": "10", "dia_vencimento": "18", "ativo": "0"},
         item["id"],
     )
-    assert services.parcelas_cartao_mes(uid, "2026-01", item["id"]) == jan
+    updated_jan = services.parcelas_cartao_mes(uid, "2026-01", item["id"])
+    assert [(p["valor"], p["vencimento"]) for p in updated_jan] == [
+        (p["valor"], p["vencimento"]) for p in jan
+    ]
     assert services.obter_cartao(uid, item["id"])["ativo"] == 0
 
 
@@ -514,3 +517,20 @@ def test_list_accounts_aggregates_balances_without_leaking_other_users():
     balances = {a["nome"]: a["saldo_atual"] for a in services.listar_contas(first)}
     assert balances["Conta principal"] == Decimal("164.50")
     assert balances["Carteira"] == Decimal("0.00")
+
+
+def test_bootstrap_admin_is_explicit_and_idempotent(app, monkeypatch):
+    monkeypatch.setenv("BOOTSTRAP_USER_ENABLED", "true")
+    monkeypatch.setenv("BOOTSTRAP_USER_NAME", "Maintainer")
+    monkeypatch.setenv("BOOTSTRAP_USER_EMAIL", "maintainer@example.com")
+    monkeypatch.setenv("BOOTSTRAP_USER_PASSWORD", "AdminStrong123")
+    runner = app.test_cli_runner()
+    result = runner.invoke(args=["bootstrap-user", "--if-enabled", "--admin"])
+    assert result.exit_code == 0, result.output
+    admin = services.obter_usuario_por_email("maintainer@example.com")
+    assert admin["nivel_acesso"] == "ADMIN"
+    assert services.usuario_e_admin(admin["id"]) is True
+    assert runner.invoke(args=["bootstrap-user", "--if-enabled"]).exit_code == 0
+    assert services.obter_usuario_por_email("maintainer@example.com")["nivel_acesso"] == "ADMIN"
+    assert services.criar_usuario("Ordinary", "ordinary@example.com", "StrongPass123")
+    assert services.obter_usuario_por_email("ordinary@example.com")["nivel_acesso"] == "USER"
