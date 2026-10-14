@@ -186,7 +186,7 @@ def parcelas_dividas_mes(usuario_id, ano_mes):
             FROM dividas d
             LEFT JOIN categorias c ON c.id=d.categoria_id
             LEFT JOIN contas ct ON ct.id=d.conta_id
-            WHERE d.usuario_id=%s AND d.ativa=1
+            WHERE d.usuario_id=%s
             """,
             (usuario_id,),
         )
@@ -202,6 +202,10 @@ def parcelas_dividas_mes(usuario_id, ano_mes):
         pagamento = pagamentos.get((p["divida_id"], p["parcela_numero"]))
         paid = _paid_numbers(divida, [r for (debt_id, _), r in pagamentos.items() if debt_id == divida["id"]])
         pagas_legado = p["parcela_numero"] in paid
+        # Quitadas e canceladas ainda exibem parcelas historicamente pagas,
+        # mas não geram compromissos futuros após serem desativadas.
+        if not divida["ativa"] and not pagas_legado:
+            continue
         if pagamento or pagas_legado:
             data_pagamento = pagamento.get("data_pagamento") if pagamento else None
             p["paga"] = True

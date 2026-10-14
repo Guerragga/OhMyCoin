@@ -30,7 +30,29 @@ def salvar_cartao(usuario_id, form, cartao_id=None):
     ativo = 1 if form.get("ativo", "1") == "1" else 0
     with db_cursor(commit=True) as cursor:
         if cartao_id:
-            obter_cartao(usuario_id, cartao_id)
+            # Serialize settings changes with purchases through the card's parent row.
+            cursor.execute(
+                "SELECT dia_fechamento, dia_vencimento FROM cartoes_credito "
+                "WHERE id=%s AND usuario_id=%s FOR UPDATE",
+                (cartao_id, usuario_id),
+            )
+            existing = cursor.fetchone()
+            if not existing:
+                raise ValueError("Cartão não encontrado.")
+            changed_cycle = (
+                int(existing["dia_fechamento"]) != dia_fechamento
+                or int(existing["dia_vencimento"]) != dia_vencimento
+            )
+            if changed_cycle:
+                cursor.execute(
+                    "SELECT id FROM compras_cartao WHERE cartao_id=%s AND usuario_id=%s LIMIT 1",
+                    (cartao_id, usuario_id),
+                )
+                if cursor.fetchone():
+                    raise ValueError(
+                        "Não é possível alterar o fechamento ou vencimento de um cartão com compras. "
+                        "Desative o cartão e cadastre outro para preservar as faturas anteriores."
+                    )
             cursor.execute(
                 """
                 UPDATE cartoes_credito SET nome=%s, bandeira=%s, limite_total=%s, dia_fechamento=%s,
@@ -69,13 +91,21 @@ def obter_cartao(usuario_id, cartao_id):
 
 
 def deletar_cartao(usuario_id, cartao_id):
-    obter_cartao(usuario_id, cartao_id)
     with db_cursor(commit=True) as cursor:
-        cursor.execute("DELETE FROM compras_cartao WHERE cartao_id=%s AND usuario_id=%s", (cartao_id, usuario_id))
         cursor.execute(
-            "UPDATE movimentacoes SET cartao_id=NULL, referencia_id=NULL WHERE cartao_id=%s AND usuario_id=%s",
+            "SELECT id FROM cartoes_credito WHERE id=%s AND usuario_id=%s FOR UPDATE",
             (cartao_id, usuario_id),
         )
+        if not cursor.fetchone():
+            raise ValueError("Cartão não encontrado.")
+        cursor.execute(
+            "SELECT id FROM compras_cartao WHERE cartao_id=%s AND usuario_id=%s LIMIT 1",
+            (cartao_id, usuario_id),
+        )
+        if cursor.fetchone():
+            raise ValueError(
+                "Este cartão possui compras. Desative-o para preservar seu histórico financeiro."
+            )
         cursor.execute("DELETE FROM cartoes_credito WHERE id=%s AND usuario_id=%s", (cartao_id, usuario_id))
 
 
