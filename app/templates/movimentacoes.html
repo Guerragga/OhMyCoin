@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Movimentações — OhMyCoin{% endblock %}
+{% block content %}
+<div class="page-header mb-4">
+    <div><p class="text-secondary mb-1">Todas as movimentações: conta, carteira, cartão e registros de dívida</p><h1 class="h3 fw-bold mb-0">Movimentações</h1></div>
+</div>
+
+<div class="card border-0 rounded-4 mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-2"><label class="form-label" for="field-movimentacoes-1-{{ loop.index if loop is defined else 0 }}">Mês</label><input type="month" name="mes" value="{{ mes }}" class="form-control" id="field-movimentacoes-1-{{ loop.index if loop is defined else 0 }}"></div>
+            <div class="col-md-2"><label class="form-label" for="field-movimentacoes-2-{{ loop.index if loop is defined else 0 }}">Início</label><input type="date" name="data_inicio" value="{{ request.args.get('data_inicio','') }}" class="form-control" id="field-movimentacoes-2-{{ loop.index if loop is defined else 0 }}"></div>
+            <div class="col-md-2"><label class="form-label" for="field-movimentacoes-3-{{ loop.index if loop is defined else 0 }}">Fim</label><input type="date" name="data_fim" value="{{ request.args.get('data_fim','') }}" class="form-control" id="field-movimentacoes-3-{{ loop.index if loop is defined else 0 }}"></div>
+            <div class="col-md-2"><label class="form-label" for="field-movimentacoes-4-{{ loop.index if loop is defined else 0 }}">Tipo</label><select name="tipo" class="form-select" id="field-movimentacoes-4-{{ loop.index if loop is defined else 0 }}"><option value="">Todos</option><option value="receita" {% if request.args.get('tipo') == 'receita' %}selected{% endif %}>Entrada</option><option value="despesa" {% if request.args.get('tipo') == 'despesa' %}selected{% endif %}>Saída</option></select></div>
+            <div class="col-md-2"><label class="form-label" for="field-movimentacoes-5-{{ loop.index if loop is defined else 0 }}">Categoria</label><select name="categoria_id" class="form-select" id="field-movimentacoes-5-{{ loop.index if loop is defined else 0 }}"><option value="">Todas</option>{% for c in categorias %}<option value="{{ c.id }}" {% if request.args.get('categoria_id')|int == c.id %}selected{% endif %}>{{ c.nome }}</option>{% endfor %}</select></div>
+            <div class="col-md-2"><label class="form-label" for="field-movimentacoes-6-{{ loop.index if loop is defined else 0 }}">Origem</label><select name="origem" class="form-select" id="field-movimentacoes-6-{{ loop.index if loop is defined else 0 }}"><option value="">Todas</option><option value="manual" {% if request.args.get('origem') == 'manual' %}selected{% endif %}>Manual</option><option value="cartao" {% if request.args.get('origem') == 'cartao' %}selected{% endif %}>Cartão</option><option value="divida" {% if request.args.get('origem') == 'divida' %}selected{% endif %}>Dívida</option></select></div>
+            <div class="col-md-3"><label class="form-label" for="field-movimentacoes-7-{{ loop.index if loop is defined else 0 }}">Conta</label><select name="conta_id" class="form-select" id="field-movimentacoes-7-{{ loop.index if loop is defined else 0 }}"><option value="">Todas</option>{% for c in contas %}<option value="{{ c.id }}" {% if request.args.get('conta_id')|int == c.id %}selected{% endif %}>{{ c.nome }}</option>{% endfor %}</select></div>
+            <div class="col-md-3"><label class="form-label" for="field-movimentacoes-8-{{ loop.index if loop is defined else 0 }}">Cartão</label><select name="cartao_id" class="form-select" id="field-movimentacoes-8-{{ loop.index if loop is defined else 0 }}"><option value="">Todos</option>{% for c in cartoes %}<option value="{{ c.id }}" {% if request.args.get('cartao_id')|int == c.id %}selected{% endif %}>{{ c.nome }}</option>{% endfor %}</select></div>
+            <div class="col-md-3"><label class="form-label" for="field-movimentacoes-9-{{ loop.index if loop is defined else 0 }}">Forma</label><select name="forma_pagamento" class="form-select" id="field-movimentacoes-9-{{ loop.index if loop is defined else 0 }}"><option value="">Todas</option><option value="conta" {% if request.args.get('forma_pagamento') == 'conta' %}selected{% endif %}>Conta/Carteira</option><option value="cartao" {% if request.args.get('forma_pagamento') == 'cartao' %}selected{% endif %}>Cartão</option></select></div>
+            <div class="col-md-3 d-flex gap-2"><button class="btn btn-outline-light flex-fill">Filtrar</button><a href="{{ url_for('finance.movimentacoes') }}" class="btn btn-soft flex-fill">Limpar</a></div>
+        </form>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card border-0 rounded-4">
+            <div class="card-body">
+                <h2 class="h5 fw-bold">{{ 'Editar movimentação' if movimentacao else 'Nova movimentação' }}</h2>
+                <form method="post">{{ csrf_input() }}<input type="hidden" name="mes_redirect" value="{{ mes }}">
+                    <div class="mb-3"><label class="form-label" for="tipoMov">Tipo</label><select name="tipo" id="tipoMov" class="form-select"><option value="receita" {% if movimentacao and movimentacao.tipo == 'receita' %}selected{% endif %}>Entrada</option><option value="despesa" {% if movimentacao and movimentacao.tipo == 'despesa' %}selected{% endif %}>Saída</option></select></div>
+                    <div class="mb-3"><label class="form-label" for="field-movimentacoes-10-{{ loop.index if loop is defined else 0 }}">Valor</label><input name="valor" class="form-control" value="{{ movimentacao.valor if movimentacao else '' }}" required id="field-movimentacoes-10-{{ loop.index if loop is defined else 0 }}"></div>
+                    <div class="mb-3"><label class="form-label" for="field-movimentacoes-11-{{ loop.index if loop is defined else 0 }}">Descrição</label><input name="descricao" class="form-control" value="{{ movimentacao.descricao if movimentacao else '' }}" placeholder="Salário, transporte, mercado, lazer..." required id="field-movimentacoes-11-{{ loop.index if loop is defined else 0 }}"></div>
+                    <div class="mb-3"><label class="form-label" for="field-movimentacoes-12-{{ loop.index if loop is defined else 0 }}">Data</label><input type="date" name="data_movimentacao" class="form-control" value="{{ movimentacao.data_movimentacao if movimentacao else '' }}" id="field-movimentacoes-12-{{ loop.index if loop is defined else 0 }}"></div>
+                    <div class="mb-3" id="formaPagamentoBox"><label class="form-label" for="formaPagamento">Forma da movimentação</label><select name="forma_pagamento" id="formaPagamento" class="form-select"><option value="conta" {% if not movimentacao or movimentacao.forma_pagamento != 'cartao' %}selected{% endif %}>Conta ou Carteira</option><option value="cartao" {% if movimentacao and movimentacao.forma_pagamento == 'cartao' %}selected{% endif %}>Cartão de crédito</option></select></div>
+                    <div class="mb-3" id="contaBox"><label class="form-label" for="field-movimentacoes-13-{{ loop.index if loop is defined else 0 }}">Conta/Carteira</label><select name="conta_id" class="form-select" id="field-movimentacoes-13-{{ loop.index if loop is defined else 0 }}"><option value="">Sem conta</option>{% for c in contas %}<option value="{{ c.id }}" {% if movimentacao and movimentacao.conta_id == c.id %}selected{% endif %}>{{ c.nome }}{% if c.tipo == 'carteira' %} — Carteira{% endif %}</option>{% endfor %}</select></div>
+                    <div class="mb-3" id="cartaoBox"><label class="form-label" for="field-movimentacoes-14-{{ loop.index if loop is defined else 0 }}">Cartão</label><select name="cartao_id" class="form-select" id="field-movimentacoes-14-{{ loop.index if loop is defined else 0 }}"><option value="">Selecione</option>{% for c in cartoes %}<option value="{{ c.id }}" {% if movimentacao and movimentacao.cartao_id == c.id %}selected{% endif %}>{{ c.nome }}</option>{% endfor %}</select></div>
+                    <div class="mb-3" id="parcelasBox"><label class="form-label" for="field-movimentacoes-15-{{ loop.index if loop is defined else 0 }}">Parcelas</label><input type="number" name="parcelas" class="form-control" min="1" max="240" value="{{ movimentacao.parcelas if movimentacao and movimentacao.parcelas else 1 }}" id="field-movimentacoes-15-{{ loop.index if loop is defined else 0 }}"></div>
+                    <div class="mb-3"><label class="form-label" for="field-movimentacoes-16-{{ loop.index if loop is defined else 0 }}">Categoria</label><select name="categoria_id" class="form-select" id="field-movimentacoes-16-{{ loop.index if loop is defined else 0 }}"><option value="">Sem categoria</option>{% for c in categorias %}<option value="{{ c.id }}" {% if movimentacao and movimentacao.categoria_id == c.id %}selected{% endif %}>{{ c.nome }} — {{ c.tipo }}</option>{% endfor %}</select></div>
+                    <div class="mb-3"><label class="form-label" for="field-movimentacoes-17-{{ loop.index if loop is defined else 0 }}">Observação</label><textarea name="observacao" class="form-control" rows="2" id="field-movimentacoes-17-{{ loop.index if loop is defined else 0 }}">{{ movimentacao.observacao if movimentacao else '' }}</textarea></div>
+                    <button class="btn btn-primary w-100">Salvar</button>
+                    {% if movimentacao %}<a href="{{ url_for('finance.movimentacoes') }}" class="btn btn-outline-light w-100 mt-2">Cancelar edição</a>{% endif %}
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card border-0 rounded-4">
+            <div class="card-header bg-transparent border-0"><h2 class="h5 fw-bold mb-0">Histórico filtrado</h2><small class="text-secondary">Compras de cartão aparecem aqui mesmo quando vieram da área de cartões.</small></div>
+            <div class="card-body table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Origem</th><th>Categoria</th><th class="text-end">Valor</th><th></th></tr></thead>
+                    <tbody>{% for item in movimentacoes %}<tr>
+                        <td>{{ item.data_movimentacao|data_br }}</td>
+                        <td><span class="badge {% if item.tipo == 'receita' %}text-bg-success{% else %}text-bg-danger{% endif %}">{{ 'Entrada' if item.tipo == 'receita' else 'Saída' }}</span></td>
+                        <td>{{ item.descricao }}{% if item.forma_pagamento == 'cartao' and item.parcelas > 1 %}<br><small class="text-secondary">{{ item.parcelas }}x no cartão</small>{% endif %}{% if item.sintetica %}<br><small class="text-secondary">registro do cartão</small>{% endif %}</td>
+                        <td>{% if item.forma_pagamento == 'cartao' %}💳 {{ item.cartao_nome or 'Cartão removido' }}{% else %}🏦 {{ item.conta_nome or '-' }}{% endif %}</td>
+                        <td>{{ item.categoria_nome or '-' }}</td>
+                        <td class="text-end">{{ item.valor|moeda }}</td>
+                        <td class="text-end">
+                            {% if item.sintetica and item.entidade == 'compra_cartao' %}
+                                <a class="btn btn-sm btn-outline-light" href="{{ url_for('finance.detalhe_cartao', cartao_id=item.cartao_id) }}">Ver cartão</a>
+                                <form method="post" action="{{ url_for('finance.deletar_compra_cartao', compra_id=item.id) }}" class="d-inline" data-confirm="Confirma a exclusão deste registro?">{{ csrf_input() }}<button class="btn btn-sm btn-outline-danger">Excluir</button></form>
+                            {% else %}
+                                {% if item.origem != 'divida' %}<a class="btn btn-sm btn-outline-light" href="{{ url_for('finance.editar_movimentacao', movimentacao_id=item.id) }}">Editar</a>{% else %}<small class="text-secondary">Excluir estorna a parcela</small>{% endif %}
+                                <form method="post" action="{{ url_for('finance.deletar_movimentacao', movimentacao_id=item.id) }}" class="d-inline" data-confirm="Confirma a exclusão deste registro?">{{ csrf_input() }}<button class="btn btn-sm btn-outline-danger">Excluir</button></form>
+                            {% endif %}
+                        </td>
+                    </tr>{% else %}<tr><td colspan="7" class="text-center text-secondary py-4">Nenhuma movimentação.</td></tr>{% endfor %}</tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script nonce="{{ csp_nonce() }}">
+function syncPaymentFields(){
+  const tipo = document.getElementById('tipoMov').value;
+  const forma = document.getElementById('formaPagamento').value;
+  const isReceita = tipo === 'receita';
+  document.getElementById('formaPagamentoBox').style.display = isReceita ? 'none' : '';
+  document.getElementById('contaBox').style.display = (isReceita || forma === 'conta') ? '' : 'none';
+  document.getElementById('cartaoBox').style.display = (!isReceita && forma === 'cartao') ? '' : 'none';
+  document.getElementById('parcelasBox').style.display = (!isReceita && forma === 'cartao') ? '' : 'none';
+}
+document.getElementById('tipoMov').addEventListener('change', syncPaymentFields);
+document.getElementById('formaPagamento').addEventListener('change', syncPaymentFields);
+syncPaymentFields();
+</script>
+{% endblock %}

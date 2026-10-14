@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Entrar — OhMyCoin{% endblock %}
+{% block content %}
+<section class="auth-shell" aria-label="Entrar no OhMyCoin">
+    <div class="auth-hero">
+        <p class="auth-kicker mb-3">OhMyCoin</p>
+        <h1 class="auth-title mb-4">Clareza para cuidar do seu dinheiro.</h1>
+        <p class="auth-description mb-0">Planeje entradas e saídas, acompanhe cartões, dívida fixa, carteira e caixinhas em um painel simples de entender.</p>
+        <ul class="auth-feature-list">
+            <li><span>📊</span><div><strong>Dashboard completo</strong><br><small class="text-secondary">Real x previsto, categorias, contas, cartões e evolução mensal.</small></div></li>
+            <li><span>💳</span><div><strong>Cartão no lugar certo</strong><br><small class="text-secondary">Compras entram por movimentações e aparecem na fatura prevista.</small></div></li>
+            <li><span>🎯</span><div><strong>Metas com previsibilidade</strong><br><small class="text-secondary">Caixinhas mostram quanto falta e quando você chega lá.</small></div></li>
+        </ul>
+    </div>
+
+    <div class="auth-card card border-0 shadow-lg">
+        <div class="card-body">
+            <div class="mb-4">
+                <span class="brand-mark mb-3">◎</span>
+                <h2 class="h3 fw-bold mb-2">Entrar na conta</h2>
+                <p class="text-secondary mb-0">Acesse seu painel financeiro pessoal.</p>
+            </div>
+            <form method="post">
+                {{ csrf_input() }}
+                <div class="mb-3">
+                    <label class="form-label" for="field-login-1-{{ loop.index if loop is defined else 0 }}">E-mail</label>
+                    <input type="email" name="email" class="form-control" placeholder="seuemail@exemplo.com" required autofocus id="field-login-1-{{ loop.index if loop is defined else 0 }}">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="field-login-2-{{ loop.index if loop is defined else 0 }}">Senha</label>
+                    <input type="password" name="password" class="form-control" placeholder="Sua senha" required id="field-login-2-{{ loop.index if loop is defined else 0 }}">
+                </div>
+                <button class="btn btn-primary w-100 py-2">Entrar</button>
+            </form>
+            {% if config.ALLOW_REGISTRATION %}
+            <p class="text-center text-secondary mt-4 mb-0">Ainda não tem conta? <a href="{{ url_for('finance.register') }}">Criar conta</a></p>
+            {% else %}
+            <p class="text-center text-secondary mt-4 mb-0">Cadastro público desabilitado nesta instância.</p>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endblock %}

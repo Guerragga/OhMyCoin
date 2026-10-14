@@ -1,0 +1,88 @@
+{% set tema = session.get('usuario_tema', 'escuro') %}
+<!DOCTYPE html>
+<html lang="pt-br" data-bs-theme="{{ 'light' if tema == 'claro' else 'dark' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="OhMyCoin, controle financeiro pessoal com previsões, movimentações, cartões, dívidas e caixinhas.">
+    <title>{% block title %}OhMyCoin{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body class="theme-{{ tema }}">
+<a href="#conteudo" class="skip-link">Pular para o conteúdo</a>
+{% if session.get('usuario_id') %}
+<nav class="navbar navbar-expand-xl app-navbar sticky-top" aria-label="Navegação principal">
+    <div class="container-fluid px-3 px-lg-4">
+        <a class="navbar-brand app-brand" href="{{ url_for('finance.dashboard') }}" aria-label="OhMyCoin Dashboard">
+            <span class="brand-mark">◎</span>
+            <span class="brand-copy">
+                <span class="brand-name">OhMyCoin</span>
+                <small>Finanças pessoais</small>
+            </span>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarApp" aria-controls="navbarApp" aria-expanded="false" aria-label="Abrir menu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarApp">
+            {% set nav_items = [
+                ('Dashboard', '◼', url_for('finance.dashboard'), '/dashboard'),
+                ('Previsões', '◌', url_for('finance.previsoes'), '/previsoes'),
+                ('Movimentações', '↕', url_for('finance.movimentacoes'), '/movimentacoes'),
+                ('Contas', '🏦', url_for('finance.contas'), '/contas'),
+                ('Cartões', '💳', url_for('finance.cartoes'), '/cartoes'),
+                ('Dívidas', '⌁', url_for('finance.dividas'), '/dividas'),
+                ('Caixinhas', '◒', url_for('finance.caixinhas'), '/caixinhas'),
+                ('Categorias', '⌗', url_for('finance.categorias'), '/categorias')
+            ] %}
+            <ul class="navbar-nav app-nav me-auto mb-3 mb-xl-0">
+                {% for label, icon, href, prefix in nav_items %}
+                <li class="nav-item">
+                    <a class="nav-link {% if request.path.startswith(prefix) %}active{% endif %}" href="{{ href }}">
+                        <span class="nav-icon">{{ icon }}</span>{{ label }}
+                    </a>
+                </li>
+                {% endfor %}
+                {% if session.get('usuario_nivel') == 'ADMIN' %}
+                <li class="nav-item">
+                    <a class="nav-link {% if request.path.startswith('/admin') %}active{% endif %}" href="{{ url_for('finance.admin') }}"><span class="nav-icon">⚡</span>Admin</a>
+                </li>
+                {% endif %}
+            </ul>
+            <div class="app-actions">
+                <a href="{{ url_for('finance.perfil') }}" class="btn btn-soft btn-sm app-user {% if request.path.startswith('/perfil') %}active{% endif %}">
+                    <span class="user-avatar">{{ session.get('usuario_avatar', '💰') }}</span>
+                    <span class="user-name">{{ session.get('usuario_nome') }}</span>
+                </a>
+                <a href="{{ url_for('finance.configuracoes') }}" class="btn btn-soft btn-sm {% if request.path.startswith('/configuracoes') %}active{% endif %}">⚙️ Configurações</a>
+                <form method="post" action="{{ url_for('finance.logout') }}" class="m-0">
+                    {{ csrf_input() }}
+                    <button class="btn btn-outline-danger btn-sm">Sair</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</nav>
+{% endif %}
+
+<main id="conteudo" class="{% if session.get('usuario_id') %}container-fluid app-main px-3 px-lg-4 py-4{% else %}auth-page{% endif %}">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-container">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+</main>
+<script nonce="{{ csp_nonce() }}" src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script nonce="{{ csp_nonce() }}" src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

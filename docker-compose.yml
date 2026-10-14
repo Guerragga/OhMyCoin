@@ -1,0 +1,56 @@
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    expose:
+      - "3306"
+    volumes:
+      - ohmycoin_mysql:/var/lib/mysql
+      - ./migrations/001_schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  web:
+    build: .
+    restart: unless-stopped
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_CONNECTION_TIMEOUT: ${DB_CONNECTION_TIMEOUT:-10}
+      APP_ENV: ${APP_ENV:-development}
+      FLASK_DEBUG: ${FLASK_DEBUG:-False}
+      SECRET_KEY: ${SECRET_KEY}
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-True}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-False}
+      SESSION_COOKIE_SAMESITE: ${SESSION_COOKIE_SAMESITE:-Lax}
+      SESSION_HOURS: ${SESSION_HOURS:-8}
+      MAX_CONTENT_LENGTH_MB: ${MAX_CONTENT_LENGTH_MB:-2}
+      ENABLE_SECURITY_HEADERS: ${ENABLE_SECURITY_HEADERS:-True}
+      TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-False}
+      LOGIN_MAX_ATTEMPTS: ${LOGIN_MAX_ATTEMPTS:-5}
+      LOGIN_WINDOW_MINUTES: ${LOGIN_WINDOW_MINUTES:-15}
+      LOGIN_LOCKOUT_MINUTES: ${LOGIN_LOCKOUT_MINUTES:-15}
+      PASSWORD_MIN_LENGTH: ${PASSWORD_MIN_LENGTH:-10}
+      DEMO_MODE: ${DEMO_MODE:-True}
+      DEMO_NAME: ${DEMO_NAME:-Demo User}
+      DEMO_EMAIL: ${DEMO_EMAIL:-demo@example.com}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-Demo@12345}
+    ports:
+      - "127.0.0.1:5000:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  ohmycoin_mysql:
