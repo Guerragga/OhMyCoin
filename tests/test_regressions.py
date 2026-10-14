@@ -8,6 +8,7 @@ from app import services
 from app.services.accounts import saldo_conta
 from app.services.cards import compromisso_cartao, meses_a_partir
 from app.services.common import somar_meses
+from app.services.users import usuario_e_admin
 from app.services.dashboard import despesas_por_categoria, total_dividas_mes
 from database import db_cursor
 from tests.conftest import login, register
@@ -529,7 +530,7 @@ def test_bootstrap_admin_is_explicit_and_idempotent(app, monkeypatch):
     assert result.exit_code == 0, result.output
     admin = services.obter_usuario_por_email("maintainer@example.com")
     assert admin["nivel_acesso"] == "ADMIN"
-    assert services.usuario_e_admin(admin["id"]) is True
+    assert usuario_e_admin(admin["id"]) is True
     assert runner.invoke(args=["bootstrap-user", "--if-enabled"]).exit_code == 0
     assert services.obter_usuario_por_email("maintainer@example.com")["nivel_acesso"] == "ADMIN"
     assert services.criar_usuario("Ordinary", "ordinary@example.com", "StrongPass123")
