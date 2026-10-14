@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Admin — OhMyCoin{% endblock %}
+{% block content %}
+<div class="page-header mb-4"><div><p class="text-secondary mb-1">Gestão de usuários e acesso</p><h1 class="h3 fw-bold mb-0">Painel admin</h1></div></div>
+<div class="row g-3 mb-4">
+    <div class="col-md-4"><div class="metric-card card border-0 rounded-4 p-3"><span class="metric-label">Usuários totais</span><strong class="metric-value">{{ total_usuarios }}</strong></div></div>
+    <div class="col-md-4"><div class="metric-card card border-0 rounded-4 p-3"><span class="metric-label">Usuários ativos</span><strong class="metric-value">{{ total_ativos }}</strong></div></div>
+    <div class="col-md-4"><div class="metric-card card border-0 rounded-4 p-3"><span class="metric-label">Movimentações</span><strong class="metric-value">{{ total_movimentacoes }}</strong></div></div>
+</div>
+<div class="card border-0 rounded-4">
+    <div class="card-header bg-transparent border-0"><h2 class="h5 fw-bold mb-0">Usuários</h2><small class="text-secondary">Admin pode alterar nome, e-mail, nível, status e redefinir senha sem saber a senha anterior.</small></div>
+    <div class="card-body">
+        <div class="row g-3">
+            {% for u in usuarios %}
+            <div class="col-12">
+                <div class="card border-0 rounded-4"><div class="card-body">
+                    <form method="post" action="{{ url_for('finance.admin_editar_usuario', alvo_id=u.id) }}">
+                        {{ csrf_input() }}
+                        <div class="row g-3 align-items-end">
+                            <div class="col-lg-3"><label class="form-label">Nome</label><div class="d-flex gap-2 align-items-center"><span class="fs-3">{{ u.avatar_emoji or '💰' }}</span><input name="nome" class="form-control" value="{{ u.nome }}" required></div></div>
+                            <div class="col-lg-3"><label class="form-label" for="field-admin-1-{{ loop.index if loop is defined else 0 }}">E-mail</label><input type="email" name="email" class="form-control" value="{{ u.email }}" required id="field-admin-1-{{ loop.index if loop is defined else 0 }}"></div>
+                            <div class="col-lg-2"><label class="form-label" for="field-admin-2-{{ loop.index if loop is defined else 0 }}">Nível</label><select name="nivel_acesso" class="form-select" id="field-admin-2-{{ loop.index if loop is defined else 0 }}"><option value="USER" {% if u.nivel_acesso == 'USER' %}selected{% endif %}>USER</option><option value="ADMIN" {% if u.nivel_acesso == 'ADMIN' %}selected{% endif %}>ADMIN</option></select></div>
+                            <div class="col-lg-2"><label class="form-label" for="field-admin-3-{{ loop.index if loop is defined else 0 }}">Status</label><select name="ativo" class="form-select" id="field-admin-3-{{ loop.index if loop is defined else 0 }}"><option value="1" {% if u.ativo %}selected{% endif %}>Ativo</option><option value="0" {% if not u.ativo %}selected{% endif %}>Inativo</option></select></div>
+                            <div class="col-lg-2"><label class="form-label" for="field-admin-4-{{ loop.index if loop is defined else 0 }}">Nova senha</label><input name="nova_senha" type="password" minlength="10" class="form-control" placeholder="Opcional" id="field-admin-4-{{ loop.index if loop is defined else 0 }}"></div>
+                            <div class="col-12 text-end"><button class="btn btn-primary">Salvar usuário</button></div>
+                        </div>
+                    </form>
+                    <form method="post" action="{{ url_for('finance.admin_deletar_usuario', alvo_id=u.id) }}" class="text-end mt-2" data-confirm="Excluir definitivamente este usuário e seus dados?">
+                        {{ csrf_input() }}
+                        <button class="btn btn-sm btn-outline-danger" {% if u.id == session.get('usuario_id') %}disabled{% endif %}>Excluir definitivamente</button>
+                    </form>
+                </div></div>
+            </div>
+            {% else %}<div class="col-12"><div class="text-center text-secondary py-4">Nenhum usuário encontrado.</div></div>{% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

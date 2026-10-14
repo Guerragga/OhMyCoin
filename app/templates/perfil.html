@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Perfil — OhMyCoin{% endblock %}
+{% block content %}
+<div class="page-header mb-4"><div><p class="text-secondary mb-1">Sua identificação dentro do sistema</p><h1 class="h3 fw-bold mb-0">Perfil</h1></div></div>
+<div class="row g-4">
+    <div class="col-lg-5">
+        <div class="card border-0 rounded-4"><div class="card-body">
+            <h2 class="h5 fw-bold">Dados do perfil</h2>
+            <form method="post">{{ csrf_input() }}<input type="hidden" name="acao" value="dados">
+                <div class="mb-3"><label class="form-label" for="field-perfil-1-{{ loop.index if loop is defined else 0 }}">Foto/emoji</label><input name="avatar_emoji" class="form-control emoji-picker-input" value="{{ usuario.avatar_emoji or '💰' }}" maxlength="8" required id="field-perfil-1-{{ loop.index if loop is defined else 0 }}"><small class="text-secondary">Use apenas emoji. Exemplo: 💰, 🐺, 🎮, 🧠.</small></div>
+                <div class="mb-3"><label class="form-label" for="field-perfil-2-{{ loop.index if loop is defined else 0 }}">Nome</label><input name="nome" class="form-control" value="{{ usuario.nome }}" required id="field-perfil-2-{{ loop.index if loop is defined else 0 }}"></div>
+                <div class="mb-3"><label class="form-label" for="field-perfil-3-{{ loop.index if loop is defined else 0 }}">E-mail</label><input class="form-control" value="{{ usuario.email }}" disabled id="field-perfil-3-{{ loop.index if loop is defined else 0 }}"><small class="text-secondary">E-mail só pode ser alterado pelo admin.</small></div>
+                <button class="btn btn-primary w-100">Salvar perfil</button>
+            </form>
+        </div></div>
+    </div>
+    <div class="col-lg-7">
+        <div class="card border-0 rounded-4"><div class="card-body">
+            <h2 class="h5 fw-bold">Alterar senha</h2>
+            <p class="text-secondary">Por segurança, para trocar sua própria senha você precisa saber a senha atual.</p>
+            <form method="post">{{ csrf_input() }}<input type="hidden" name="acao" value="senha">
+                <div class="mb-3"><label class="form-label" for="field-perfil-4-{{ loop.index if loop is defined else 0 }}">Senha atual</label><input type="password" name="senha_atual" class="form-control" required id="field-perfil-4-{{ loop.index if loop is defined else 0 }}"></div>
+                <div class="mb-3"><label class="form-label" for="field-perfil-5-{{ loop.index if loop is defined else 0 }}">Nova senha</label><input type="password" name="nova_senha" class="form-control" minlength="10" required id="field-perfil-5-{{ loop.index if loop is defined else 0 }}"></div>
+                <div class="mb-3"><label class="form-label" for="field-perfil-6-{{ loop.index if loop is defined else 0 }}">Confirmar nova senha</label><input type="password" name="confirmar_senha" class="form-control" minlength="10" required id="field-perfil-6-{{ loop.index if loop is defined else 0 }}"></div>
+                <button class="btn btn-primary">Alterar senha</button>
+            </form>
+        </div></div>
+    </div>
+</div>
+{% endblock %}

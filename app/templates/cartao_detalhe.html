@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}{{ cartao.nome }} — OhMyCoin{% endblock %}
+{% block content %}
+<div class="page-header mb-4">
+    <div><p class="text-secondary mb-1">Detalhe do cartão, fatura e movimentações</p><h1 class="h3 fw-bold mb-0">{{ cartao.nome }}</h1></div>
+    <div class="d-flex gap-2"><a href="{{ url_for('finance.cartoes', mes=mes) }}" class="btn btn-outline-light">Voltar</a><a href="{{ url_for('finance.movimentacoes', cartao_id=cartao.id, forma_pagamento='cartao') }}" class="btn btn-primary">Ver em movimentações</a></div>
+</div>
+<div class="row g-3 mb-4">
+    {% for fatura in faturas %}
+        {% set valor = namespace(total=0) %}
+        {% for item in fatura.por_cartao %}{% if item.cartao_id == cartao.id %}{% set valor.total = item.total %}{% endif %}{% endfor %}
+        <div class="col-md-6 col-xl-2"><div class="metric-card card border-0 rounded-4 p-3 h-100"><span class="metric-label text-warning">{{ fatura.ano_mes|mes_br }}</span><strong class="metric-value">{{ valor.total|moeda }}</strong><div class="metric-helper">Fatura prevista</div></div></div>
+    {% endfor %}
+</div>
+<div class="row g-4">
+    <div class="col-lg-7"><div class="card border-0 rounded-4"><div class="card-header bg-transparent border-0"><h2 class="h5 fw-bold mb-0">Fatura em {{ mes|mes_br }}</h2></div><div class="card-body table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Compra</th><th>Parcela</th><th>Vencimento</th><th class="text-end">Valor</th></tr></thead><tbody>{% for item in parcelas_mes %}<tr><td>{{ item.descricao }}<br><small class="text-secondary">compra {{ item.data_compra|data_br }}</small></td><td>{{ item.parcela_atual }}/{{ item.parcelas }}</td><td>{{ item.vencimento|data_br }}</td><td class="text-end">{{ item.valor|moeda }}</td></tr>{% else %}<tr><td colspan="4" class="text-center text-secondary py-4">Nenhuma parcela neste mês.</td></tr>{% endfor %}</tbody></table></div></div></div>
+    <div class="col-lg-5"><div class="card border-0 rounded-4"><div class="card-header bg-transparent border-0"><h2 class="h5 fw-bold mb-0">Dados do cartão</h2></div><div class="card-body"><div class="d-flex justify-content-between"><span>Bandeira</span><strong>{{ cartao.bandeira or '-' }}</strong></div><div class="d-flex justify-content-between"><span>Limite</span><strong>{{ cartao.limite_total|moeda }}</strong></div><div class="d-flex justify-content-between"><span>Fecha</span><strong>dia {{ cartao.dia_fechamento }}</strong></div><div class="d-flex justify-content-between"><span>Vence</span><strong>dia {{ cartao.dia_vencimento }}</strong></div><a href="{{ url_for('finance.editar_cartao', cartao_id=cartao.id, mes=mes) }}" class="btn btn-outline-light w-100 mt-3">Editar cartão</a></div></div></div>
+</div>
+<div class="card border-0 rounded-4 mt-4"><div class="card-header bg-transparent border-0"><h2 class="h5 fw-bold mb-0">Todas as compras do cartão</h2><small class="text-secondary">Aqui fica a lista completa, separada da visão geral.</small></div><div class="card-body table-responsive"><table class="table table-hover align-middle mb-0"><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Parcelas</th><th class="text-end">Total</th><th></th></tr></thead><tbody>{% for item in compras %}<tr><td>{{ item.data_compra|data_br }}</td><td>{{ item.descricao }}</td><td>{{ item.categoria_nome or '-' }}</td><td>{{ item.parcelas }}x de {{ item.valor_parcela|moeda }}</td><td class="text-end">{{ item.valor_total|moeda }}</td><td class="text-end"><form method="post" action="{{ url_for('finance.deletar_compra_cartao', compra_id=item.id) }}" data-confirm="Confirma a exclusão deste registro?">{{ csrf_input() }}<button class="btn btn-sm btn-outline-danger">Excluir</button></form></td></tr>{% else %}<tr><td colspan="6" class="text-center text-secondary py-4">Nenhuma compra nesse cartão.</td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}

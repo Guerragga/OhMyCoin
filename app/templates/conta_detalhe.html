@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}{{ conta.nome }} — OhMyCoin{% endblock %}
+{% block content %}
+<div class="page-header mb-4">
+    <div><p class="text-secondary mb-1">Extrato da conta/carteira</p><h1 class="h3 fw-bold mb-0">{{ conta.nome }}</h1></div>
+    <div class="d-flex gap-2"><a href="{{ url_for('finance.contas') }}" class="btn btn-outline-light">Voltar</a><a href="{{ url_for('finance.movimentacoes', conta_id=conta.id) }}" class="btn btn-primary">Nova movimentação</a></div>
+</div>
+<div class="card border-0 rounded-4 mb-4">
+    <div class="card-body d-flex flex-wrap gap-4">
+        <div><small class="text-secondary">Tipo</small><div class="fw-bold">{{ conta.tipo }}</div></div>
+        <div><small class="text-secondary">Saldo inicial</small><div class="fw-bold">{{ conta.saldo_inicial|moeda }}</div></div>
+        <div><small class="text-secondary">Moeda</small><div class="fw-bold">{{ conta.moeda }}</div></div>
+    </div>
+</div>
+<div class="card border-0 rounded-4">
+    <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div><h2 class="h5 fw-bold mb-0">Movimentações da conta</h2><small class="text-secondary">Somente lançamentos ligados a esta conta/carteira.</small></div>
+        <form method="get" class="d-flex gap-2"><input type="month" name="mes" value="{{ mes }}" class="form-control"><button class="btn btn-outline-light">Filtrar</button></form>
+    </div>
+    <div class="card-body table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Categoria</th><th class="text-end">Valor</th><th></th></tr></thead>
+            <tbody>{% for item in movimentacoes %}<tr>
+                <td>{{ item.data_movimentacao|data_br }}</td>
+                <td><span class="badge {% if item.tipo == 'receita' %}text-bg-success{% else %}text-bg-danger{% endif %}">{{ 'Entrada' if item.tipo == 'receita' else 'Saída' }}</span></td>
+                <td>{{ item.descricao }}</td>
+                <td>{{ item.categoria_nome or '-' }}</td>
+                <td class="text-end">{{ item.valor|moeda }}</td>
+                <td class="text-end"><a class="btn btn-sm btn-outline-light" href="{{ url_for('finance.editar_movimentacao', movimentacao_id=item.id) }}">Editar</a></td>
+            </tr>{% else %}<tr><td colspan="6" class="text-center text-secondary py-4">Nenhuma movimentação nessa conta.</td></tr>{% endfor %}</tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

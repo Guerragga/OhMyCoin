@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — OhMyCoin{% endblock %}
+{% block head %}<script nonce="{{ csp_nonce() }}" src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>{% endblock %}
+{% block content %}
+<div class="page-header mb-4">
+    <div>
+        <p class="text-secondary mb-1">Visão mensal, previsibilidade e análise dos seus hábitos</p>
+        <h1 class="h3 fw-bold mb-0">Dashboard financeiro</h1>
+    </div>
+    <form method="get" class="d-flex gap-2">
+        <input type="month" name="mes" value="{{ resumo.ano_mes }}" class="form-control">
+        <button class="btn btn-outline-light">Filtrar</button>
+    </form>
+</div>
+
+{% if resumo.alertas %}
+<div class="row g-3 mb-4">
+    {% for alerta in resumo.alertas %}
+    <div class="col-md-6 col-xl-4">
+        <div class="alert alert-warning rounded-4 h-100 mb-0">⚠️ {{ alerta }}</div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="row g-3 mb-4">
+    {% set cards = [
+        ('Entradas reais', resumo.receitas_reais, 'text-success', '↗', 'Dinheiro que entrou no mês'),
+        ('Saídas registradas', resumo.despesas_reais, 'text-danger', '↘', 'Contas, incluindo dívidas pagas'),
+        ('Saldo do mês', resumo.saldo_real_mes, 'text-info', '◎', 'Fluxo de caixa registrado no mês'),
+        ('Faturas do mês', resumo.total_cartao_mes, 'text-warning', '💳', 'Cartões no mês selecionado'),
+        ('Dívidas do mês', resumo.total_dividas_mes, 'text-warning', '⌁', 'Parcelas abertas ou pagas'),
+        ('Saldo nas contas', resumo.saldo_contas, 'text-primary', '🏦', 'Bancos e carteira'),
+        ('Capital geral', resumo.capital_geral, 'text-success', '◆', 'Contas + reservas externas'),
+        ('Patrimônio estimado', resumo.patrimonio_liquido, 'text-light', '◇', 'Capital menos dívidas e parcelas de cartão')
+    ] %}
+    {% for label, value, color, icon, helper in cards %}
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="metric-card card border-0 rounded-4 p-3 h-100">
+            <div class="metric-top">
+                <span class="metric-label {{ color }}">{{ label }}</span>
+                <span class="metric-icon">{{ icon }}</span>
+            </div>
+            <strong class="metric-value">{{ value|moeda }}</strong>
+            <div class="metric-helper">{{ helper }}</div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="row g-4 mb-4">
+    {% if resumo.config.mostrar_grafico_real_previsto %}
+    <div class="col-xl-7">
+        <div class="card dashboard-card border-0 rounded-4 h-100">
+            <div class="card-header bg-transparent border-0"><h2 class="h5 mb-0 fw-bold">Real x previsto</h2><small class="text-secondary">Fluxo de caixa registrado versus orçamento. Cartões são compromissos projetados.</small></div>
+            <div class="card-body chart-box"><canvas id="chartRealPrevisto"></canvas></div>
+        </div>
+    </div>
+    {% endif %}
+    {% if resumo.config.mostrar_grafico_categorias %}
+    <div class="col-xl-5">
+        <div class="card dashboard-card border-0 rounded-4 h-100">
+            <div class="card-header bg-transparent border-0"><h2 class="h5 mb-0 fw-bold">Compromissos por categoria</h2><small class="text-secondary">Despesas registradas e parcelas previstas.</small></div>
+            <div class="card-body chart-box"><canvas id="chartCategorias"></canvas></div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="row g-4 mb-4">
+    {% if resumo.config.mostrar_grafico_evolucao %}
+    <div class="col-xl-6">
+        <div class="card dashboard-card border-0 rounded-4 h-100">
+            <div class="card-header bg-transparent border-0"><h2 class="h5 mb-0 fw-bold">Evolução dos últimos 6 meses</h2><small class="text-secondary">Entradas e compromissos, incluindo parcelas previstas.</small></div>
+            <div class="card-body chart-box"><canvas id="chartEvolucao"></canvas></div>
+        </div>
+    </div>
+    {% endif %}
+    {% if resumo.config.mostrar_grafico_forma_pagamento %}
+    <div class="col-xl-6">
+        <div class="card dashboard-card border-0 rounded-4 h-100">
+            <div class="card-header bg-transparent border-0"><h2 class="h5 mb-0 fw-bold">Composição dos compromissos</h2><small class="text-secondary">Conta/carteira, cartões e dívidas no mesmo mês.</small></div>
+            <div class="card-body chart-box"><canvas id="chartFormaPagamento"></canvas></div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="row g-4 mb-4">
+    {% if resumo.config.mostrar_grafico_contas %}
+    <div class="col-xl-6">
+        <div class="card dashboard-card border-0 rounded-4 h-100">
+            <div class="card-header bg-transparent border-0"><h2 class="h5 mb-0 fw-bold">Gastos por conta/carteira</h2><small class="text-secondary">Saídas agrupadas pela origem do dinheiro.</small></div>
+            <div class="card-body chart-box"><canvas id="chartContas"></canvas></div>
+        </div>
+    </div>
+    {% endif %}
+    {% if resumo.config.mostrar_grafico_cartoes %}
+    <div class="col-xl-6">
+        <div class="card dashboard-card border-0 rounded-4 h-100">
+            <div class="card-header bg-transparent border-0"><h2 class="h5 mb-0 fw-bold">Gastos por cartão</h2><small class="text-secondary">Faturas previstas por cartão de crédito.</small></div>
+            <div class="card-body chart-box"><canvas id="chartCartoes"></canvas></div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-xl-4">
+        <div class="card dashboard-card border-0 rounded-4 h-100">
+            <div class="card-header bg-transparent border-0 d-flex justify-content-between gap-3 align-items-start">
+                <div><h2 class="h5 mb-0 fw-bold">Previsões do mês</h2><small class="text-secondary">Planejado para {{ resumo.ano_mes }}</small></div>
+                <a href="{{ url_for('finance.previsoes', mes=resumo.ano_mes) }}" class="btn btn-sm btn-outline-light">Gerenciar</a>
+            </div>
+            <div class="card-body table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead><tr><th>Tipo</th><th>Descrição</th><th class="text-end">Valor</th></tr></thead>
+                    <tbody>
+                    {% for item in resumo.previsoes[:8] %}
+                    <tr>
+                        <td><span class="badge {% if item.tipo == 'receita' %}text-bg-success{% else %}text-bg-danger{% endif %}">{{ item.tipo }}</span></td>
+                        <td>{{ item.descricao }}{% if item.recorrente %}<br><small class="text-secondary">recorrente</small>{% endif %}</td>
+                        <td class="text-end">{{ item.valor_previsto|moeda }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="3" class="empty-state">Nenhuma previsão cadastrada.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="card dashboard-card border-0 rounded-4 h-100">
+            <div class="card-header bg-transparent border-0 d-flex justify-content-between gap-3 align-items-start">
+                <div><h2 class="h5 mb-0 fw-bold">Dívidas do mês</h2><small class="text-secondary">Parcelas fixas previstas</small></div>
+                <a href="{{ url_for('finance.dividas', mes=resumo.ano_mes) }}" class="btn btn-sm btn-outline-light">Gerenciar</a>
+            </div>
+            <div class="card-body table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead><tr><th>Parcela</th><th>Vence</th><th class="text-end">Valor</th></tr></thead>
+                    <tbody>
+                    {% for item in resumo.parcelas_dividas %}
+                    <tr>
+                        <td>{{ item.descricao }}<br><small class="text-secondary">{{ item.parcela_numero }}/{{ item.parcelas_total }} {% if item.paga %}• paga{% endif %}</small></td>
+                        <td>{{ item.vencimento|data_br }}</td>
+                        <td class="text-end">{{ item.valor|moeda }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="3" class="empty-state">Nenhuma dívida para este mês.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="card dashboard-card border-0 rounded-4 h-100">
+            <div class="card-header bg-transparent border-0 d-flex justify-content-between gap-3 align-items-start">
+                <div><h2 class="h5 mb-0 fw-bold">Cartões do mês</h2><small class="text-secondary">Compras parceladas previstas</small></div>
+                <a href="{{ url_for('finance.cartoes', mes=resumo.ano_mes) }}" class="btn btn-sm btn-outline-light">Gerenciar</a>
+            </div>
+            <div class="card-body table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead><tr><th>Compra</th><th>Cartão</th><th class="text-end">Parcela</th></tr></thead>
+                    <tbody>
+                    {% for item in resumo.parcelas_cartao[:8] %}
+                    <tr>
+                        <td>{{ item.descricao }}<br><small class="text-secondary">{{ item.parcela_atual }}/{{ item.parcelas }}</small></td>
+                        <td>{{ item.cartao_nome }}</td>
+                        <td class="text-end">{{ item.valor|moeda }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="3" class="empty-state">Nenhuma parcela de cartão neste mês.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card dashboard-card border-0 rounded-4 mb-4">
+    <div class="card-header bg-transparent border-0 d-flex justify-content-between gap-3 align-items-start flex-wrap">
+        <div><h2 class="h5 fw-bold mb-0">Faturas atuais e próximas</h2><small class="text-secondary">Visão geral dos cartões cadastrados.</small></div>
+        <a href="{{ url_for('finance.cartoes', mes=resumo.ano_mes) }}" class="btn btn-sm btn-outline-light">Ver cartões</a>
+    </div>
+    <div class="card-body table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Mês</th><th class="text-end">Total das faturas</th></tr></thead>
+            <tbody>
+            {% for item in resumo.faturas_geral %}
+            <tr><td>{{ item.ano_mes|mes_br }}</td><td class="text-end">{{ item.total|moeda }}</td></tr>
+            {% else %}
+            <tr><td colspan="2" class="empty-state">Nenhuma fatura prevista.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card dashboard-card border-0 rounded-4">
+    <div class="card-header bg-transparent border-0 d-flex justify-content-between gap-3 align-items-start flex-wrap">
+        <div><h2 class="h5 fw-bold mb-0">Últimas movimentações do mês</h2><small class="text-secondary">Histórico recente de entradas e saídas.</small></div>
+        <a href="{{ url_for('finance.movimentacoes', mes=resumo.ano_mes) }}" class="btn btn-sm btn-outline-light">Ver todas</a>
+    </div>
+    <div class="card-body table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Origem</th><th>Categoria</th><th class="text-end">Valor</th></tr></thead>
+            <tbody>
+            {% for item in resumo.ultimas_movimentacoes %}
+            <tr>
+                <td>{{ item.data_movimentacao|data_br }}</td>
+                <td><span class="badge {% if item.tipo == 'receita' %}text-bg-success{% else %}text-bg-danger{% endif %}">{{ item.tipo }}</span></td>
+                <td>{{ item.descricao }}</td>
+                <td>{% if item.forma_pagamento == 'cartao' %}💳 {{ item.cartao_nome or '-' }}{% else %}🏦 {{ item.conta_nome or '-' }}{% endif %}</td>
+                <td>{{ item.categoria_nome or '-' }}</td>
+                <td class="text-end">{{ item.valor|moeda }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="empty-state">Nenhuma movimentação no mês.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script nonce="{{ csp_nonce() }}">
+const resumo = {
+  realPrevisto: { real: [{{ resumo.receitas_reais }}, {{ resumo.despesas_reais }}, {{ resumo.saldo_real_mes }}], previsto: [{{ resumo.entradas_previstas }}, {{ resumo.saidas_previstas }}, {{ resumo.saldo_previsto_mes }}] },
+  categoriasLabels: {{ resumo.categorias|map(attribute='categoria')|list|tojson }},
+  categoriasValues: {{ resumo.categorias|map(attribute='total')|list|tojson }},
+  serie: {{ resumo.serie_mensal|tojson }},
+  formaLabels: {{ resumo.forma_pagamento|map(attribute='forma')|list|tojson }},
+  formaValues: {{ resumo.forma_pagamento|map(attribute='total')|list|tojson }},
+  contasLabels: {{ resumo.contas_grafico|map(attribute='conta')|list|tojson }},
+  contasValues: {{ resumo.contas_grafico|map(attribute='total')|list|tojson }},
+  cartoesLabels: {{ resumo.cartoes_grafico|map(attribute='cartao')|list|tojson }},
+  cartoesValues: {{ resumo.cartoes_grafico|map(attribute='total')|list|tojson }}
+};
+
+const styles = getComputedStyle(document.body);
+const cssVar = (name, fallback) => (styles.getPropertyValue(name).trim() || fallback);
+const moeda = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(v || 0));
+const palette = {
+  green: cssVar('--green-strong', '#22c55e'),
+  greenSoft: 'rgba(34, 197, 94, .20)',
+  mint: cssVar('--green', '#9cf2b0'),
+  blue: cssVar('--blue', '#38bdf8'),
+  amber: cssVar('--amber', '#fbbf24'),
+  red: cssVar('--red', '#fb7185'),
+  purple: cssVar('--purple', '#a78bfa'),
+  text: cssVar('--app-text', '#f3fff6'),
+  muted: cssVar('--app-muted', '#9db2a4'),
+  border: cssVar('--app-border', 'rgba(156,242,176,.16)')
+};
+const chartColors = [palette.green, palette.blue, palette.amber, palette.red, palette.purple, palette.mint, '#f472b6', '#60a5fa'];
+Chart.defaults.color = palette.muted;
+Chart.defaults.borderColor = palette.border;
+Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+
+function withCurrencyTooltip(options = {}) {
+  const horizontal = options.indexAxis === 'y';
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, padding: 18 } },
+      tooltip: {
+        backgroundColor: 'rgba(5, 8, 6, .92)',
+        borderColor: palette.border,
+        borderWidth: 1,
+        padding: 12,
+        callbacks: { label: (ctx) => `${ctx.dataset.label || ctx.label}: ${moeda(ctx.raw)}` }
+      }
+    },
+    scales: {
+      x: { grid: { display: horizontal }, ticks: { color: palette.muted, ...(horizontal ? {callback: (value) => moeda(value)} : {}) } },
+      y: { grid: { display: !horizontal, color: palette.border }, ticks: { color: palette.muted, ...(!horizontal ? {callback: (value) => moeda(value)} : {}) } }
+    },
+    ...options
+  };
+}
+function chartIfExists(id, config){ const el = document.getElementById(id); if(el){ new Chart(el, config); } }
+
+chartIfExists('chartRealPrevisto', {
+  type:'bar',
+  data:{
+    labels:['Entradas','Saídas','Saldo'],
+    datasets:[
+      {label:'Real', data:resumo.realPrevisto.real, backgroundColor:palette.green, borderRadius:12, borderSkipped:false},
+      {label:'Previsto', data:resumo.realPrevisto.previsto, backgroundColor:palette.blue, borderRadius:12, borderSkipped:false}
+    ]
+  },
+  options:withCurrencyTooltip()
+});
+chartIfExists('chartCategorias', {
+  type:'doughnut',
+  data:{labels:resumo.categoriasLabels, datasets:[{data:resumo.categoriasValues, backgroundColor:chartColors, borderColor:'transparent', hoverOffset:8}]},
+  options:withCurrencyTooltip({cutout:'64%', scales:{}})
+});
+chartIfExists('chartEvolucao', {
+  type:'line',
+  data:{
+    labels:resumo.serie.labels,
+    datasets:[
+      {label:'Entradas', data:resumo.serie.receitas, borderColor:palette.green, backgroundColor:palette.greenSoft, tension:.38, fill:false, pointRadius:3},
+      {label:'Saídas', data:resumo.serie.despesas, borderColor:palette.red, backgroundColor:'rgba(251,113,133,.18)', tension:.38, fill:false, pointRadius:3},
+      {label:'Saldo', data:resumo.serie.saldos, borderColor:palette.blue, backgroundColor:'rgba(56,189,248,.14)', tension:.38, fill:true, pointRadius:3}
+    ]
+  },
+  options:withCurrencyTooltip()
+});
+chartIfExists('chartFormaPagamento', {
+  type:'pie',
+  data:{labels:resumo.formaLabels, datasets:[{data:resumo.formaValues, backgroundColor:[palette.green, palette.blue, palette.amber], borderColor:'transparent', hoverOffset:8}]},
+  options:withCurrencyTooltip({scales:{}})
+});
+chartIfExists('chartContas', {
+  type:'bar',
+  data:{labels:resumo.contasLabels, datasets:[{label:'Gastos', data:resumo.contasValues, backgroundColor:palette.purple, borderRadius:12, borderSkipped:false}]},
+  options:withCurrencyTooltip({indexAxis:'y'})
+});
+chartIfExists('chartCartoes', {
+  type:'bar',
+  data:{labels:resumo.cartoesLabels, datasets:[{label:'Gastos', data:resumo.cartoesValues, backgroundColor:palette.amber, borderRadius:12, borderSkipped:false}]},
+  options:withCurrencyTooltip({indexAxis:'y'})
+});
+</script>
+{% endblock %}

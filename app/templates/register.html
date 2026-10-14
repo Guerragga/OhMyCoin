@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Criar conta — OhMyCoin{% endblock %}
+{% block content %}
+<section class="auth-shell" aria-label="Criar conta no OhMyCoin">
+    <div class="auth-hero">
+        <p class="auth-kicker mb-3">Comece sem burocracia</p>
+        <h1 class="auth-title mb-4">Seu financeiro organizado em minutos.</h1>
+        <p class="auth-description mb-0">Cadastro limpo, sem CPF e sem dados desnecessários. A ideia é entrar, cadastrar suas bases e acompanhar o mês com clareza.</p>
+        <ul class="auth-feature-list">
+            <li><span>⚡</span><div><strong>Fluxo rápido</strong><br><small class="text-secondary">Nome, e-mail e senha. Só o essencial.</small></div></li>
+            <li><span>🏦</span><div><strong>Contas e carteira</strong><br><small class="text-secondary">Separe banco, dinheiro físico e cartão de crédito.</small></div></li>
+            <li><span>🧠</span><div><strong>Decisão melhor</strong><br><small class="text-secondary">Veja antes se o mês fecha no positivo ou no negativo.</small></div></li>
+        </ul>
+    </div>
+
+    <div class="auth-card card border-0 shadow-lg">
+        <div class="card-body">
+            <div class="mb-4">
+                <span class="brand-mark mb-3">◎</span>
+                <h2 class="h3 fw-bold mb-2">Criar conta</h2>
+                <p class="text-secondary mb-0">Simples: nome, e-mail e senha.</p>
+            </div>
+            <form method="post">
+                {{ csrf_input() }}
+                <div class="mb-3">
+                    <label class="form-label" for="field-register-1-{{ loop.index if loop is defined else 0 }}">Nome</label>
+                    <input type="text" name="name" class="form-control" placeholder="Seu nome" required maxlength="100" id="field-register-1-{{ loop.index if loop is defined else 0 }}">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="field-register-2-{{ loop.index if loop is defined else 0 }}">E-mail</label>
+                    <input type="email" name="email" class="form-control" placeholder="seuemail@exemplo.com" required id="field-register-2-{{ loop.index if loop is defined else 0 }}">
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="field-register-3-{{ loop.index if loop is defined else 0 }}">Senha</label>
+                        <input type="password" name="password" class="form-control" required minlength="10" id="field-register-3-{{ loop.index if loop is defined else 0 }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="field-register-4-{{ loop.index if loop is defined else 0 }}">Confirmar senha</label>
+                        <input type="password" name="password_confirm" class="form-control" required minlength="10" id="field-register-4-{{ loop.index if loop is defined else 0 }}">
+                    </div>
+                </div>
+                <button class="btn btn-primary w-100 py-2 mt-4">Criar conta</button>
+            </form>
+            <p class="text-center text-secondary mt-4 mb-0">Já tem conta? <a href="{{ url_for('finance.login') }}">Entrar</a></p>
+        </div>
+    </div>
+</section>
+{% endblock %}
