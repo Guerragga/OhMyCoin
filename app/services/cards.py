@@ -30,7 +30,29 @@ def salvar_cartao(usuario_id, form, cartao_id=None):
     ativo = 1 if form.get("ativo", "1") == "1" else 0
     with db_cursor(commit=True) as cursor:
         if cartao_id:
-            obter_cartao(usuario_id, cartao_id)
+            # Serialize settings changes with purchases through the card's parent row.
+            cursor.execute(
+                "SELECT dia_fechamento, dia_vencimento FROM cartoes_credito "
+                "WHERE id=%s AND usuario_id=%s FOR UPDATE",
+                (cartao_id, usuario_id),
+            )
+            existing = cursor.fetchone()
+            if not existing:
+                raise ValueError("Cartão não encontrado.")
+            changed_cycle = (
+                int(existing["dia_fechamento"]) != dia_fechamento
+                or int(existing["dia_vencimento"]) != dia_vencimento
+            )
+            if changed_cycle:
+                cursor.execute(
+                    "SELECT id FROM compras_cartao WHERE cartao_id=%s AND usuario_id=%s LIMIT 1",
+                    (cartao_id, usuario_id),
+                )
+                if cursor.fetchone():
+                    raise ValueError(
+                        "Não é possível alterar o fechamento ou vencimento de um cartão com compras. "
+                        "Desative o cartão e cadastre outro para preservar as faturas anteriores."
+                    )
             cursor.execute(
                 """
                 UPDATE cartoes_credito SET nome=%s, bandeira=%s, limite_total=%s, dia_fechamento=%s,
@@ -69,13 +91,21 @@ def obter_cartao(usuario_id, cartao_id):
 
 
 def deletar_cartao(usuario_id, cartao_id):
-    obter_cartao(usuario_id, cartao_id)
     with db_cursor(commit=True) as cursor:
-        cursor.execute("DELETE FROM compras_cartao WHERE cartao_id=%s AND usuario_id=%s", (cartao_id, usuario_id))
         cursor.execute(
-            "UPDATE movimentacoes SET cartao_id=NULL, referencia_id=NULL WHERE cartao_id=%s AND usuario_id=%s",
+            "SELECT id FROM cartoes_credito WHERE id=%s AND usuario_id=%s FOR UPDATE",
             (cartao_id, usuario_id),
         )
+        if not cursor.fetchone():
+            raise ValueError("Cartão não encontrado.")
+        cursor.execute(
+            "SELECT id FROM compras_cartao WHERE cartao_id=%s AND usuario_id=%s LIMIT 1",
+            (cartao_id, usuario_id),
+        )
+        if cursor.fetchone():
+            raise ValueError(
+                "Este cartão possui compras. Desative-o para preservar seu histórico financeiro."
+            )
         cursor.execute("DELETE FROM cartoes_credito WHERE id=%s AND usuario_id=%s", (cartao_id, usuario_id))
 
 
@@ -152,20 +182,26 @@ def data_vencimento_fatura(cartao, ano_mes: str) -> date:
     return data_por_dia(normalizar_mes(ano_mes), int(cartao.get("dia_vencimento") or 10))
 
 
-def parcelas_cartao_mes(usuario_id, ano_mes, cartao_id=None):
-    ano_mes = normalizar_mes(ano_mes)
+def _compras_detalhadas(usuario_id, cartao_id=None):
+    """Load card purchases once for invoice and card-summary projections."""
     with db_cursor() as cursor:
         cursor.execute(
             """
-            SELECT cc.*, ca.nome AS cartao_nome, ca.dia_fechamento, ca.dia_vencimento, cat.nome AS categoria_nome
+            SELECT cc.*, ca.nome AS cartao_nome, ca.dia_fechamento, ca.dia_vencimento,
+                   cat.nome AS categoria_nome
             FROM compras_cartao cc
-            JOIN cartoes_credito ca ON ca.id=cc.cartao_id
+            JOIN cartoes_credito ca ON ca.id=cc.cartao_id AND ca.usuario_id=cc.usuario_id
             LEFT JOIN categorias cat ON cat.id=cc.categoria_id
             WHERE cc.usuario_id=%s AND (%s IS NULL OR cc.cartao_id=%s)
             """,
             (usuario_id, cartao_id, cartao_id),
         )
-        compras = cursor.fetchall()
+        return cursor.fetchall()
+
+
+def _parcelas_de_compras(compras, ano_mes):
+    """Compute one invoice month from already loaded purchases (no database I/O)."""
+    ano_mes = normalizar_mes(ano_mes)
     parcelas = []
     alvo = datetime.strptime(ano_mes + "-01", "%Y-%m-%d").date()
     for compra in compras:
@@ -200,6 +236,9 @@ def parcelas_cartao_mes(usuario_id, ano_mes, cartao_id=None):
     return parcelas
 
 
+def parcelas_cartao_mes(usuario_id, ano_mes, cartao_id=None):
+    return _parcelas_de_compras(_compras_detalhadas(usuario_id, cartao_id), ano_mes)
+
 def total_fatura_cartao_mes(usuario_id, cartao_id, ano_mes):
     return sum((Decimal(p["valor"] or 0) for p in parcelas_cartao_mes(usuario_id, ano_mes, cartao_id)), Decimal("0.00"))
 
@@ -226,19 +265,11 @@ def listar_compras_cartao(usuario_id, cartao_id=None, limite=200):
         return cursor.fetchall()
 
 
-def compromisso_cartao(usuario_id, ano_mes, cartao_id=None):
-    """Outstanding scheduled installments, assuming earlier invoices were settled."""
+def _compromisso_de_compras(compras, ano_mes):
+    """Outstanding installment amount, assuming earlier invoices are settled."""
     target = datetime.strptime(normalizar_mes(ano_mes) + "-01", "%Y-%m-%d").date()
-    with db_cursor() as cursor:
-        cursor.execute(
-            "SELECT cc.*, ca.dia_fechamento, ca.dia_vencimento FROM compras_cartao cc "
-            "JOIN cartoes_credito ca ON ca.id=cc.cartao_id "
-            "WHERE cc.usuario_id=%s AND (%s IS NULL OR cc.cartao_id=%s)",
-            (usuario_id, cartao_id, cartao_id),
-        )
-        purchases = cursor.fetchall()
     total = Decimal("0.00")
-    for purchase in purchases:
+    for purchase in compras:
         first = datetime.strptime(
             _mes_vencimento_primeira_parcela(purchase["data_compra"], purchase) + "-01", "%Y-%m-%d"
         ).date()
@@ -248,6 +279,10 @@ def compromisso_cartao(usuario_id, ano_mes, cartao_id=None):
     return total
 
 
+def compromisso_cartao(usuario_id, ano_mes, cartao_id=None):
+    """Outstanding scheduled installments, assuming earlier invoices were settled."""
+    return _compromisso_de_compras(_compras_detalhadas(usuario_id, cartao_id), ano_mes)
+
 def listar_cartoes(usuario_id, apenas_ativos=False, ano_mes=None):
     ano_mes = normalizar_mes(ano_mes or mes_atual())
     with db_cursor() as cursor:
@@ -256,8 +291,14 @@ def listar_cartoes(usuario_id, apenas_ativos=False, ano_mes=None):
             (usuario_id, int(apenas_ativos)),
         )
         cartoes = cursor.fetchall()
+    # The same purchases are reused for each card and month; avoids N x M SQL queries.
+    compras_por_cartao = {cartao["id"]: [] for cartao in cartoes}
+    for compra in _compras_detalhadas(usuario_id):
+        if compra["cartao_id"] in compras_por_cartao:
+            compras_por_cartao[compra["cartao_id"]].append(compra)
     proximos_meses = meses_a_partir(ano_mes, 4)
     for cartao in cartoes:
+        compras = compras_por_cartao[cartao["id"]]
         cartao["melhor_dia_compra"] = melhor_dia_compra(cartao)
         cartao["proxima_data_fechamento"] = proxima_data_dia(cartao["dia_fechamento"])
         cartao["proxima_data_vencimento"] = proxima_data_dia(cartao["dia_vencimento"])
@@ -265,32 +306,42 @@ def listar_cartoes(usuario_id, apenas_ativos=False, ano_mes=None):
         cartao["dias_para_vencimento"] = (cartao["proxima_data_vencimento"] - hoje()).days
         faturas = []
         for mes_ref in proximos_meses:
-            total = total_fatura_cartao_mes(usuario_id, cartao["id"], mes_ref)
+            total = sum((Decimal(p["valor"]) for p in _parcelas_de_compras(compras, mes_ref)), Decimal("0.00"))
             faturas.append({"ano_mes": mes_ref, "total": total, "vencimento": data_vencimento_fatura(cartao, mes_ref)})
         cartao["faturas"] = faturas
         cartao["fatura_atual"] = faturas[0]["total"] if faturas else Decimal("0.00")
         cartao["proximas_faturas"] = faturas[1:]
         cartao["limite_disponivel_estimado"] = max(
             Decimal("0.00"),
-            Decimal(cartao["limite_total"] or 0) - compromisso_cartao(usuario_id, ano_mes, cartao["id"]),
+            Decimal(cartao["limite_total"] or 0) - _compromisso_de_compras(compras, ano_mes),
         )
     return cartoes
 
-
 def resumo_faturas_geral(usuario_id, ano_mes, meses=4):
-    # Inactive cards can still have installments due.
-    cartoes = listar_cartoes(usuario_id, ano_mes=ano_mes)
+    # Inactive cards still retain their invoice history.
+    with db_cursor() as cursor:
+        cursor.execute(
+            "SELECT id, nome FROM cartoes_credito WHERE usuario_id=%s ORDER BY ativo DESC, nome",
+            (usuario_id,),
+        )
+        cartoes = cursor.fetchall()
+    compras_por_cartao = {cartao["id"]: [] for cartao in cartoes}
+    for compra in _compras_detalhadas(usuario_id):
+        if compra["cartao_id"] in compras_por_cartao:
+            compras_por_cartao[compra["cartao_id"]].append(compra)
     resultado = []
     for mes_ref in meses_a_partir(ano_mes, meses):
         total = Decimal("0.00")
         por_cartao = []
         for cartao in cartoes:
-            valor = total_fatura_cartao_mes(usuario_id, cartao["id"], mes_ref)
+            valor = sum(
+                (Decimal(p["valor"]) for p in _parcelas_de_compras(compras_por_cartao[cartao["id"]], mes_ref)),
+                Decimal("0.00"),
+            )
             total += valor
             por_cartao.append({"cartao_id": cartao["id"], "cartao_nome": cartao["nome"], "total": valor})
         resultado.append({"ano_mes": mes_ref, "total": total, "por_cartao": por_cartao})
     return resultado
-
 
 def deletar_compra_cartao(usuario_id, compra_id):
     with db_cursor(commit=True) as cursor:

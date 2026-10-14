@@ -82,14 +82,18 @@ def listar_contas(usuario_id, apenas_ativas=False):
     with db_cursor() as cursor:
         cursor.execute(
             """
-            SELECT * FROM contas
-            WHERE usuario_id=%s
-              AND (%s=0 OR ativa=1)
-            ORDER BY CASE WHEN tipo='carteira' THEN 0 ELSE 1 END, ativa DESC, nome
+            SELECT c.*, c.saldo_inicial + COALESCE(t.movimentos, 0) AS saldo_atual
+            FROM contas c
+            LEFT JOIN (
+                SELECT usuario_id, conta_id,
+                    SUM(CASE WHEN tipo='receita' THEN valor ELSE -valor END) AS movimentos
+                FROM movimentacoes
+                WHERE usuario_id=%s AND conta_id IS NOT NULL
+                GROUP BY usuario_id, conta_id
+            ) t ON t.usuario_id=c.usuario_id AND t.conta_id=c.id
+            WHERE c.usuario_id=%s AND (%s=0 OR c.ativa=1)
+            ORDER BY CASE WHEN c.tipo='carteira' THEN 0 ELSE 1 END, c.ativa DESC, c.nome
             """,
-            (usuario_id, somente_ativas),
+            (usuario_id, usuario_id, somente_ativas),
         )
-        contas = cursor.fetchall()
-    for conta in contas:
-        conta["saldo_atual"] = saldo_conta(usuario_id, conta["id"])
-    return contas
+        return cursor.fetchall()

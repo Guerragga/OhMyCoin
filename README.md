@@ -1,5 +1,9 @@
 # OhMyCoin — Personal Finance Management Platform
 
+[![Continuous integration](https://github.com/Guerragga/OhMyCoin/actions/workflows/ci.yml/badge.svg)](https://github.com/Guerragga/OhMyCoin/actions/workflows/ci.yml)
+
+**Architecture and data model:** [Engineering notes and ER diagram](docs/ARCHITECTURE.md).
+
 A server-rendered personal-finance application built with Python, Flask and MySQL. It brings together accounts, transactions, budgets, credit-card installments, debt payments and savings goals.
 
 The project focuses on maintainable financial rules: separating domain services,
@@ -71,6 +75,8 @@ The former monolithic service module is no longer used.
 - Paying a debt creates one expense. Removing that expense reverses the payment and restores the schedule.
 - Card purchases appear once in the unified transaction view.
 - Card limit and net-worth figures are **estimates**: the application does not reconcile paid card invoices; earlier invoices are assumed settled.
+- Cards with registered purchases cannot change closing/due dates or be deleted: deactivate the old card and create another instead, preserving historical invoices.
+- Paid debt installments remain visible in historical month views even after a debt is settled or cancelled.
 - Savings goals are separate external reserves, not allocations of an existing account balance. Entering the same money in both places would double-count assets.
 - Budgets are independently entered plans, not automatically matched to actual transactions.
 
@@ -96,9 +102,13 @@ credentials through the hosting platform's secret store. Never upload a real
 platform health check to use `/readyz`.
 
 For a closed-registration deployment, the `bootstrap-user --if-enabled` CLI
-command can create the first account from temporary environment variables. It
-never resets an existing account. Disable and clear all `BOOTSTRAP_USER_*`
-values immediately after the first successful deployment.
+command creates the first ordinary account from temporary environment variables.
+To create the initial administrator, explicitly run
+`python -m flask --app run bootstrap-user --if-enabled --admin` with
+`BOOTSTRAP_USER_ENABLED=True` and valid `BOOTSTRAP_USER_NAME`,
+`BOOTSTRAP_USER_EMAIL` and `BOOTSTRAP_USER_PASSWORD` values. It never
+resets or elevates an existing account. Disable and clear all
+`BOOTSTRAP_USER_*` values immediately after successful initialization.
 
 ## Test and inspect
 

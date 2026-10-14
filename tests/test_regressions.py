@@ -8,6 +8,7 @@ from app import services
 from app.services.accounts import saldo_conta
 from app.services.cards import compromisso_cartao, meses_a_partir
 from app.services.common import somar_meses
+from app.services.users import usuario_e_admin
 from app.services.dashboard import despesas_por_categoria, total_dividas_mes
 from database import db_cursor
 from tests.conftest import login, register
@@ -432,3 +433,132 @@ def test_xss_financial_description_is_escaped(authenticated_client):
     )
     assert b"<script>alert(1)</script>" not in response.data
     assert b"&lt;script&gt;alert(1)&lt;/script&gt;" in response.data
+
+
+def test_paid_off_debt_remains_visible_in_historical_schedule():
+    uid = user()
+    item, _ = debt(uid, count=1)
+    month = date.today().strftime("%Y-%m")
+    services.pagar_parcela_divida(uid, item["id"], month)
+    assert services.obter_divida(uid, item["id"])["status"] == "quitada"
+    history = services.parcelas_dividas_mes(uid, month)
+    assert len(history) == 1
+    assert history[0]["paga"] is True
+    assert total_dividas_mes(uid, month) == Decimal("100")
+
+
+def test_cancelled_debt_keeps_paid_history_without_future_obligations():
+    uid = user()
+    item, account = debt(uid, count=2)
+    month = date.today().strftime("%Y-%m")
+    next_month = somar_meses(date.today().replace(day=1), 1).strftime("%Y-%m")
+    services.pagar_parcela_divida(uid, item["id"], month)
+    services.salvar_divida(
+        uid,
+        {
+            "descricao": "Example debt",
+            "valor_parcela": "100",
+            "parcelas_total": "2",
+            "parcelas_pagas": "1",
+            "data_inicio": date.today().replace(day=1).isoformat(),
+            "dia_vencimento": "20",
+            "conta_id": str(account["id"]),
+            "ativa": "0",
+        },
+        item["id"],
+    )
+    assert services.parcelas_dividas_mes(uid, month)[0]["paga"] is True
+    assert services.parcelas_dividas_mes(uid, next_month) == []
+
+
+def test_card_billing_cycle_cannot_rewrite_existing_installments():
+    uid = user()
+    item = card(uid)
+    services.registrar_compra_cartao(
+        uid,
+        {"cartao_id": item["id"], "descricao": "Historical purchase",
+         "valor_total": "90", "parcelas": "3", "data_compra": "2026-01-10"},
+    )
+    jan = services.parcelas_cartao_mes(uid, "2026-01", item["id"])
+    assert jan[0]["valor"] == Decimal("30")
+    with pytest.raises(ValueError, match="alterar o fechamento ou vencimento"):
+        services.salvar_cartao(
+            uid,
+            {"nome": "Changed", "limite_total": "1000", "dia_fechamento": "5", "dia_vencimento": "18"},
+            item["id"],
+        )
+    with pytest.raises(ValueError, match="possui compras"):
+        services.deletar_cartao(uid, item["id"])
+    assert services.obter_cartao(uid, item["id"])["dia_fechamento"] == 10
+    services.salvar_cartao(
+        uid,
+        {"nome": "Renamed", "limite_total": "1200", "dia_fechamento": "10", "dia_vencimento": "18", "ativo": "0"},
+        item["id"],
+    )
+    updated_jan = services.parcelas_cartao_mes(uid, "2026-01", item["id"])
+    assert [(p["valor"], p["vencimento"]) for p in updated_jan] == [
+        (p["valor"], p["vencimento"]) for p in jan
+    ]
+    assert services.obter_cartao(uid, item["id"])["ativo"] == 0
+
+
+def test_list_accounts_aggregates_balances_without_leaking_other_users():
+    first, second = user(), user("independent@example.com")
+    a = next(x for x in services.listar_contas(first) if x["nome"] == "Conta principal")
+    b = next(x for x in services.listar_contas(second) if x["nome"] == "Conta principal")
+    services.salvar_movimentacao(
+        first, {"tipo": "receita", "valor": "200", "descricao": "Credit", "conta_id": a["id"]}
+    )
+    services.salvar_movimentacao(
+        first, {"tipo": "despesa", "valor": "35.50", "descricao": "Debit", "conta_id": a["id"]}
+    )
+    services.salvar_movimentacao(
+        second, {"tipo": "receita", "valor": "999", "descricao": "Private", "conta_id": b["id"]}
+    )
+    balances = {a["nome"]: a["saldo_atual"] for a in services.listar_contas(first)}
+    assert balances["Conta principal"] == Decimal("164.50")
+    assert balances["Carteira"] == Decimal("0.00")
+
+
+def test_bootstrap_admin_is_explicit_and_idempotent(app, monkeypatch):
+    monkeypatch.setenv("BOOTSTRAP_USER_ENABLED", "true")
+    monkeypatch.setenv("BOOTSTRAP_USER_NAME", "Maintainer")
+    monkeypatch.setenv("BOOTSTRAP_USER_EMAIL", "maintainer@example.com")
+    monkeypatch.setenv("BOOTSTRAP_USER_PASSWORD", "AdminStrong123")
+    runner = app.test_cli_runner()
+    result = runner.invoke(args=["bootstrap-user", "--if-enabled", "--admin"])
+    assert result.exit_code == 0, result.output
+    admin = services.obter_usuario_por_email("maintainer@example.com")
+    assert admin["nivel_acesso"] == "ADMIN"
+    assert usuario_e_admin(admin["id"]) is True
+    assert runner.invoke(args=["bootstrap-user", "--if-enabled"]).exit_code == 0
+    assert services.obter_usuario_por_email("maintainer@example.com")["nivel_acesso"] == "ADMIN"
+    assert services.criar_usuario("Ordinary", "ordinary@example.com", "StrongPass123")
+    assert services.obter_usuario_por_email("ordinary@example.com")["nivel_acesso"] == "USER"
+
+
+def test_card_summaries_are_consistent_across_multiple_cards():
+    uid = user()
+    first = card(uid)
+    services.salvar_cartao(
+        uid, {"nome": "Other card", "limite_total": "900",
+              "dia_fechamento": "8", "dia_vencimento": "15"}
+    )
+    second = next(c for c in services.listar_cartoes(uid) if c["nome"] == "Other card")
+    services.registrar_compra_cartao(
+        uid, {"cartao_id": first["id"], "descricao": "First", "valor_total": "90",
+              "parcelas": "3", "data_compra": "2026-01-01"}
+    )
+    services.registrar_compra_cartao(
+        uid, {"cartao_id": second["id"], "descricao": "Second", "valor_total": "25",
+              "parcelas": "1", "data_compra": "2026-01-01"}
+    )
+    summary = services.resumo_faturas_geral(uid, "2026-01", meses=3)
+    assert [s["total"] for s in summary] == [
+        Decimal("55"), Decimal("30"), Decimal("30")
+    ]
+    totals = services.listar_cartoes(uid, ano_mes="2026-01")
+    by_id = {c["id"]: c for c in totals}
+    assert by_id[first["id"]]["fatura_atual"] == Decimal("30")
+    assert by_id[second["id"]]["fatura_atual"] == Decimal("25")
+    assert sum((p["valor"] for p in services.parcelas_cartao_mes(uid, "2026-01")), Decimal("0")) == Decimal("55")

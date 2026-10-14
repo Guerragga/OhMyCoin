@@ -142,7 +142,10 @@ def senha_confere(hash_armazenado, senha_digitada):
         return False
 
 
-def criar_usuario(nome, email, senha):
+def criar_usuario(nome, email, senha, *, nivel_acesso="USER"):
+    # Public registration never accepts a caller-supplied role.
+    if nivel_acesso not in {"USER", "ADMIN"}:
+        raise ValueError("Nível de acesso inválido.")
     nome = texto_obrigatorio(nome, "Nome", 100)
     email = validar_email(email)
     senha = validar_senha(senha)
@@ -154,8 +157,8 @@ def criar_usuario(nome, email, senha):
             raise ValueError("Este e-mail já está cadastrado.")
 
         cursor.execute(
-            "INSERT INTO usuarios (nome, email, senha) VALUES (%s, %s, %s)",
-            (nome, email, senha_hash),
+            "INSERT INTO usuarios (nome, email, senha, nivel_acesso) VALUES (%s, %s, %s, %s)",
+            (nome, email, senha_hash, nivel_acesso),
         )
         usuario_id = cursor.lastrowid
         criar_estrutura_padrao_usuario(usuario_id, cursor)
