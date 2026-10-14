@@ -97,7 +97,7 @@ jobs:
         run: python scripts/browser_smoke.py
       - name: Save demo screenshots
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: demo-browser-screenshots
           path: browser-artifacts/
